@@ -1,0 +1,41 @@
+# Виртуальное окружение
+venv/
+
+# Файлы логов
+logs/
+*.log
+
+# Файлы Python-кеша
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Конфигурации IDE
+.vscode/
+.idea/
+
+# .env с токенами и ключами
+.env
+
+# Файлы тестов и отчётов
+htmlcov/
+coverage.xml
+*.cover
+.cache
+pytest_cache/
+.pytest_cache/
+
+# Системные файлы
+.DS_Store
+Thumbs.db
+
+# Бинарные файлы и дампы
+*.sqlite3
+*.db
+*.swp
+*.bak
+
+# Сборки
+dist/
+build/
+*.egg-info/
