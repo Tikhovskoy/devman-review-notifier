@@ -1,57 +1,73 @@
-from devman_api import wait_for_new_review
-from exceptions import (
-    DevmanTimeoutError,
-    DevmanNetworkError,
-    DevmanConnectionError,
-)
-from logging_config import logger
-from telegram_handler import send_telegram_message
+import os
+import time
+import logging
+from dotenv import load_dotenv
+import requests
+
+from devman_api import wait_for_new_review, configure_api
+from logging_config import setup_logging
+from telegram_handler import configure_telegram, send_telegram_message
 from logic.message_formatter import format_review_message
 
+logger = logging.getLogger("devman_bot")
 
-async def process_review(attempt: dict) -> None:
-    """Формирует и отправляет сообщение в Telegram о результатах проверки."""
-    message = format_review_message(
+def process_review(attempt: dict) -> None:
+    msg = format_review_message(
         attempt["lesson_title"],
         attempt["is_negative"],
         attempt["lesson_url"],
     )
-    await send_telegram_message(message)
+    send_telegram_message(msg)
     logger.info(f"Проверка обработана: {attempt['lesson_title']}")
 
+def main():
+    load_dotenv()
+    setup_logging()
 
-async def main():
-    """Основной цикл ожидания и обработки новых проверок."""
+    telegram_token     = os.environ["TELEGRAM_BOT_TOKEN"]
+    telegram_chat_id   = os.environ["TELEGRAM_CHAT_ID"]
+    devman_api_token   = os.environ["DEVMAN_API_TOKEN"]
+    devman_longpoll_url = os.getenv(
+        "DEVMAN_LONGPOLL_URL",
+        "https://dvmn.org/api/long_polling/"
+    )
+
+    configure_api(token=devman_api_token, url=devman_longpoll_url)
+    configure_telegram(token=telegram_token, chat_id=telegram_chat_id)
+
     last_timestamp = None
     logger.info("Бот запущен. Ожидаем новые проверки от Devman...")
 
     while True:
         try:
-            response = await wait_for_new_review(last_timestamp)
-            logger.debug(f"Запрос выполнен. GET параметры: {response.get('request_query')}")
+            response = wait_for_new_review(last_timestamp)
+            logger.debug(f"GET-параметры: {response.get('request_query')}")
 
             if response["status"] == "found":
                 for attempt in response["new_attempts"]:
-                    await process_review(attempt)
+                    process_review(attempt)
                 last_timestamp = response["last_attempt_timestamp"]
-                logger.debug(f"Обновлён timestamp (после found): {last_timestamp}")
+                logger.debug(f"Обновлён timestamp: {last_timestamp}")
 
-            elif response["status"] == "timeout":
-                logger.info("Нет новых проверок (таймаут сервера Devman)")
+            else:
+                logger.info("Нет новых проверок (таймаут)")
                 last_timestamp = response["timestamp"]
 
-        except DevmanConnectionError:
-            logger.warning("Отключение интернета — повтор через 10 сек")
-            await asyncio.sleep(10)
+        except requests.exceptions.ReadTimeout:
+            logger.warning("Таймаут сервера Devman — ждём 5 сек.")
+            time.sleep(5)
 
-        except (DevmanTimeoutError, DevmanNetworkError):
-            await asyncio.sleep(5)
+        except requests.exceptions.ConnectionError:
+            logger.warning("Проблемы с сетью — ждём 10 сек.")
+            time.sleep(10)
 
-        except Exception as error:
-            logger.exception(f"Необработанная ошибка: {error}")
-            await asyncio.sleep(5)
+        except requests.exceptions.HTTPError as http_err:
+            logger.error(f"Devman API ответил ошибкой HTTP: {http_err}")
+            time.sleep(30)
 
+        except Exception as err:
+            logger.exception(f"Неожиданная ошибка: {err}")
+            time.sleep(5)
 
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
+    main()
