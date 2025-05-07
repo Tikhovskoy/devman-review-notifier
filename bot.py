@@ -6,17 +6,14 @@ import requests
 import telegram
 from logging.handlers import RotatingFileHandler
 
-
 LOG_FILE = os.path.join("logs", "devman_bot.log")
 FORMATTER = logging.Formatter(
     "[%(asctime)s] [%(levelname)s] %(name)s: %(message)s"
 )
 
-
 def ensure_log_directory() -> None:
     """Создаёт папку для логов, если её ещё нет."""
     os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
-
 
 def setup_logging() -> None:
     """Настраивает логгер 'devman_bot': handler, формат и уровень INFO."""
@@ -26,9 +23,7 @@ def setup_logging() -> None:
     log.setLevel(logging.INFO)
     log.addHandler(handler)
 
-
 logger = logging.getLogger("devman_bot")
-
 
 def format_review_message(
     lesson_title: str, is_negative: bool, lesson_url: str
@@ -50,32 +45,32 @@ def format_review_message(
         f"{lesson_url}"
     )
 
-
 def main() -> None:
     """
     Запускает бот:
       1. Грузит .env
-      2. Настраивает логирование
-      3. Читает нужные переменные окружения
-      4. Запускает цикл long-polling и отправляет сообщения в Telegram
+      2. Создаёт папку логов и настраивает логгер
+      3. Читает переменные окружения
+      4. Цикл long-polling и отправка в Telegram
     """
     load_dotenv()
     ensure_log_directory()
     setup_logging()
 
-    telegram_token = os.environ["TELEGRAM_BOT_TOKEN"]
-    telegram_chat_id = os.environ["TELEGRAM_CHAT_ID"]
-    devman_api_token = os.environ["DEVMAN_API_TOKEN"]
+    telegram_token     = os.environ["TELEGRAM_BOT_TOKEN"]
+    telegram_chat_id   = os.environ["TELEGRAM_CHAT_ID"]
+    devman_api_token   = os.environ["DEVMAN_API_TOKEN"]
     devman_longpoll_url = os.getenv(
-        "DEVMAN_LONGPOLL_URL", "https://dvmn.org/api/long_polling/"
+        "DEVMAN_LONGPOLL_URL",
+        "https://dvmn.org/api/long_polling/"
     )
 
     bot = telegram.Bot(token=telegram_token)
     last_timestamp = None
     logger.info("Бот запущен. Ожидаем новые проверки от Devman…")
 
-    while True:
-        try:
+    try:
+        while True:
             params = {"timestamp": last_timestamp} if last_timestamp else {}
             headers = {"Authorization": f"Token {devman_api_token}"}
 
@@ -103,21 +98,9 @@ def main() -> None:
                 logger.debug("Long-polling timeout — повторный запрос")
                 last_timestamp = data["timestamp"]
 
-        except requests.exceptions.ReadTimeout:
-            continue
-
-        except requests.exceptions.ConnectionError:
-            logger.warning("Проблемы с сетью — ждём 10 сек.")
-            time.sleep(10)
-
-        except requests.exceptions.HTTPError as http_err:
-            logger.error(f"Devman API ответил ошибкой HTTP: {http_err}")
-            time.sleep(30)
-
-        except Exception as err:
-            logger.exception(f"Неожиданная ошибка: {err}")
-            time.sleep(5)
-
+    except KeyboardInterrupt:
+        logger.info("Получен сигнал прерывания — завершаем работу")
+        return
 
 if __name__ == "__main__":
     main()
