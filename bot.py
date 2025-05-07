@@ -4,12 +4,40 @@ import logging
 from dotenv import load_dotenv
 import requests
 import telegram
+from logging.handlers import RotatingFileHandler
 
-from logging_config import ensure_log_directory, setup_logging
+
+LOG_FILE = os.path.join("logs", "devman_bot.log")
+FORMATTER = logging.Formatter(
+    "[%(asctime)s] [%(levelname)s] %(name)s: %(message)s"
+)
+
+
+def ensure_log_directory() -> None:
+    """Создаёт папку для логов, если её ещё нет."""
+    os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+
+
+def setup_logging() -> None:
+    """Настраивает логгер 'devman_bot': handler, формат и уровень INFO."""
+    handler = RotatingFileHandler(LOG_FILE, maxBytes=500_000, backupCount=5)
+    handler.setFormatter(FORMATTER)
+    log = logging.getLogger("devman_bot")
+    log.setLevel(logging.INFO)
+    log.addHandler(handler)
+
 
 logger = logging.getLogger("devman_bot")
 
-def format_review_message(lesson_title: str, is_negative: bool, lesson_url: str) -> str:
+
+def format_review_message(
+    lesson_title: str, is_negative: bool, lesson_url: str
+) -> str:
+    """
+    Формирует текст уведомления о проверке:
+      - если is_negative=True, указывает на ошибки;
+      - иначе — что всё хорошо.
+    """
     if is_negative:
         return (
             f"У вас проверили работу «{lesson_title}»\n"
@@ -22,21 +50,27 @@ def format_review_message(lesson_title: str, is_negative: bool, lesson_url: str)
         f"{lesson_url}"
     )
 
-def main():
+
+def main() -> None:
+    """
+    Запускает бот:
+      1. Грузит .env
+      2. Настраивает логирование
+      3. Читает нужные переменные окружения
+      4. Запускает цикл long-polling и отправляет сообщения в Telegram
+    """
     load_dotenv()
     ensure_log_directory()
-    setup_logging()     
+    setup_logging()
 
-    telegram_token     = os.environ["TELEGRAM_BOT_TOKEN"]
-    telegram_chat_id   = os.environ["TELEGRAM_CHAT_ID"]
-    devman_api_token   = os.environ["DEVMAN_API_TOKEN"]
+    telegram_token = os.environ["TELEGRAM_BOT_TOKEN"]
+    telegram_chat_id = os.environ["TELEGRAM_CHAT_ID"]
+    devman_api_token = os.environ["DEVMAN_API_TOKEN"]
     devman_longpoll_url = os.getenv(
-        "DEVMAN_LONGPOLL_URL",
-        "https://dvmn.org/api/long_polling/"
+        "DEVMAN_LONGPOLL_URL", "https://dvmn.org/api/long_polling/"
     )
 
     bot = telegram.Bot(token=telegram_token)
-
     last_timestamp = None
     logger.info("Бот запущен. Ожидаем новые проверки от Devman…")
 
@@ -45,14 +79,14 @@ def main():
             params = {"timestamp": last_timestamp} if last_timestamp else {}
             headers = {"Authorization": f"Token {devman_api_token}"}
 
-            response = requests.get(
+            resp = requests.get(
                 devman_longpoll_url,
                 headers=headers,
                 params=params,
                 timeout=90
             )
-            response.raise_for_status()
-            data = response.json()
+            resp.raise_for_status()
+            data = resp.json()
 
             if data["status"] == "found":
                 for attempt in data["new_attempts"]:
@@ -66,11 +100,10 @@ def main():
                 last_timestamp = data["last_attempt_timestamp"]
                 logger.debug(f"Обновлён timestamp: {last_timestamp}")
             else:
-                logger.info("Нет новых проверок (таймаут)")
+                logger.debug("Long-polling timeout — повторный запрос")
                 last_timestamp = data["timestamp"]
 
         except requests.exceptions.ReadTimeout:
-            logger.debug("Long-polling timeout — повторный запрос")
             continue
 
         except requests.exceptions.ConnectionError:
