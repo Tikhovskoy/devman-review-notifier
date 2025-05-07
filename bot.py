@@ -5,10 +5,9 @@ from dotenv import load_dotenv
 import requests
 import telegram
 
-from logging_config import setup_logging
+from logging_config import ensure_log_directory, setup_logging
 
 logger = logging.getLogger("devman_bot")
-
 
 def format_review_message(lesson_title: str, is_negative: bool, lesson_url: str) -> str:
     if is_negative:
@@ -23,10 +22,10 @@ def format_review_message(lesson_title: str, is_negative: bool, lesson_url: str)
         f"{lesson_url}"
     )
 
-
 def main():
     load_dotenv()
-    setup_logging()
+    ensure_log_directory()
+    setup_logging()     
 
     telegram_token     = os.environ["TELEGRAM_BOT_TOKEN"]
     telegram_chat_id   = os.environ["TELEGRAM_CHAT_ID"]
