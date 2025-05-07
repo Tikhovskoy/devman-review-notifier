@@ -71,8 +71,8 @@ def main():
                 last_timestamp = data["timestamp"]
 
         except requests.exceptions.ReadTimeout:
-            logger.warning("Таймаут сервера Devman — ждём 5 сек.")
-            time.sleep(5)
+            logger.debug("Long-polling timeout — повторный запрос")
+            continue
 
         except requests.exceptions.ConnectionError:
             logger.warning("Проблемы с сетью — ждём 10 сек.")
