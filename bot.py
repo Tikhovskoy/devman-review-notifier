@@ -3,22 +3,26 @@ import time
 import logging
 from dotenv import load_dotenv
 import requests
+import telegram
 
-from devman_api import wait_for_new_review, configure_api
 from logging_config import setup_logging
-from telegram_handler import configure_telegram, send_telegram_message
-from logic.message_formatter import format_review_message
 
 logger = logging.getLogger("devman_bot")
 
-def process_review(attempt: dict) -> None:
-    msg = format_review_message(
-        attempt["lesson_title"],
-        attempt["is_negative"],
-        attempt["lesson_url"],
+
+def format_review_message(lesson_title: str, is_negative: bool, lesson_url: str) -> str:
+    if is_negative:
+        return (
+            f"У вас проверили работу «{lesson_title}»\n"
+            f"К сожалению, в работе нашлись ошибки.\n"
+            f"{lesson_url}"
+        )
+    return (
+        f"У вас проверили работу «{lesson_title}»\n"
+        f"Преподавателю всё понравилось, можно приступать к следующему уроку.\n"
+        f"{lesson_url}"
     )
-    send_telegram_message(msg)
-    logger.info(f"Проверка обработана: {attempt['lesson_title']}")
+
 
 def main():
     load_dotenv()
@@ -32,26 +36,39 @@ def main():
         "https://dvmn.org/api/long_polling/"
     )
 
-    configure_api(token=devman_api_token, url=devman_longpoll_url)
-    configure_telegram(token=telegram_token, chat_id=telegram_chat_id)
+    bot = telegram.Bot(token=telegram_token)
 
     last_timestamp = None
-    logger.info("Бот запущен. Ожидаем новые проверки от Devman...")
+    logger.info("Бот запущен. Ожидаем новые проверки от Devman…")
 
     while True:
         try:
-            response = wait_for_new_review(last_timestamp)
-            logger.debug(f"GET-параметры: {response.get('request_query')}")
+            params = {"timestamp": last_timestamp} if last_timestamp else {}
+            headers = {"Authorization": f"Token {devman_api_token}"}
 
-            if response["status"] == "found":
-                for attempt in response["new_attempts"]:
-                    process_review(attempt)
-                last_timestamp = response["last_attempt_timestamp"]
+            response = requests.get(
+                devman_longpoll_url,
+                headers=headers,
+                params=params,
+                timeout=90
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            if data["status"] == "found":
+                for attempt in data["new_attempts"]:
+                    msg = format_review_message(
+                        attempt["lesson_title"],
+                        attempt["is_negative"],
+                        attempt["lesson_url"],
+                    )
+                    bot.send_message(chat_id=telegram_chat_id, text=msg)
+                    logger.info(f"Проверка обработана: {attempt['lesson_title']}")
+                last_timestamp = data["last_attempt_timestamp"]
                 logger.debug(f"Обновлён timestamp: {last_timestamp}")
-
             else:
                 logger.info("Нет новых проверок (таймаут)")
-                last_timestamp = response["timestamp"]
+                last_timestamp = data["timestamp"]
 
         except requests.exceptions.ReadTimeout:
             logger.warning("Таймаут сервера Devman — ждём 5 сек.")
@@ -68,6 +85,7 @@ def main():
         except Exception as err:
             logger.exception(f"Неожиданная ошибка: {err}")
             time.sleep(5)
+
 
 if __name__ == "__main__":
     main()
