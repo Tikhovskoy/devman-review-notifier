@@ -6,7 +6,9 @@ import requests
 import telegram
 from logging.handlers import RotatingFileHandler
 
+
 logger = logging.getLogger("devman_bot")
+
 
 def setup_logging(log_file_path: str) -> None:
     """Создаёт папку логов и настраивает логгер."""
@@ -18,6 +20,7 @@ def setup_logging(log_file_path: str) -> None:
     handler.setFormatter(formatter)
     logger.setLevel(logging.INFO)
     logger.addHandler(handler)
+
 
 def format_review_message(
     lesson_title: str, is_negative: bool, lesson_url: str
@@ -34,6 +37,7 @@ def format_review_message(
         f"Преподавателю всё понравилось, можно приступать к следующему уроку.\n"
         f"{lesson_url}"
     )
+
 
 def main() -> None:
     """Запускает бота: загрузка .env, настройка логгера, long-polling."""
@@ -84,6 +88,7 @@ def main() -> None:
 
     except KeyboardInterrupt:
         logger.info("Получен сигнал прерывания — завершаем работу")
+
 
 if __name__ == "__main__":
     main()
