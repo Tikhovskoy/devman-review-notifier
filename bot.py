@@ -8,13 +8,13 @@ from logging.handlers import RotatingFileHandler
 
 logger = logging.getLogger("devman_bot")
 
-def setup_logging(log_file: str) -> None:
+def setup_logging(log_file_path: str) -> None:
     """Создаёт папку логов и настраивает логгер."""
-    os.makedirs(os.path.dirname(log_file), exist_ok=True)
+    os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
     formatter = logging.Formatter(
         "[%(asctime)s] [%(levelname)s] %(name)s: %(message)s"
     )
-    handler = RotatingFileHandler(log_file, maxBytes=500_000, backupCount=5)
+    handler = RotatingFileHandler(log_file_path, maxBytes=500_000, backupCount=5)
     handler.setFormatter(formatter)
     logger.setLevel(logging.INFO)
     logger.addHandler(handler)
@@ -38,8 +38,8 @@ def format_review_message(
 def main() -> None:
     """Запускает бота: загрузка .env, настройка логгера, long-polling."""
     load_dotenv()
-    log_file = os.path.join("logs", "devman_bot.log")
-    setup_logging(log_file)
+    log_file_path = os.path.join("logs", "devman_bot.log")
+    setup_logging(log_file_path)
 
     telegram_token      = os.environ["TELEGRAM_BOT_TOKEN"]
     telegram_chat_id    = os.environ["TELEGRAM_CHAT_ID"]
@@ -65,10 +65,10 @@ def main() -> None:
                 timeout=90
             )
             response.raise_for_status()
-            response_data = response.json()
+            review_response = response.json()
 
-            if response_data["status"] == "found":
-                for attempt in response_data["new_attempts"]:
+            if review_response["status"] == "found":
+                for attempt in review_response["new_attempts"]:
                     msg = format_review_message(
                         attempt["lesson_title"],
                         attempt["is_negative"],
@@ -76,11 +76,11 @@ def main() -> None:
                     )
                     bot.send_message(chat_id=telegram_chat_id, text=msg)
                     logger.info(f"Проверка обработана: {attempt['lesson_title']}")
-                last_timestamp = response_data["last_attempt_timestamp"]
+                last_timestamp = review_response["last_attempt_timestamp"]
                 logger.debug(f"Обновлён timestamp: {last_timestamp}")
             else:
                 logger.debug("Long-polling timeout — повторный запрос")
-                last_timestamp = response_data["timestamp"]
+                last_timestamp = review_response["timestamp"]
 
     except KeyboardInterrupt:
         logger.info("Получен сигнал прерывания — завершаем работу")
