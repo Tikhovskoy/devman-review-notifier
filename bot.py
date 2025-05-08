@@ -8,15 +8,13 @@ from logging.handlers import RotatingFileHandler
 
 logger = logging.getLogger("devman_bot")
 
-LOG_FILE = os.path.join("logs", "devman_bot.log")
-
-def setup_logging() -> None:
-    """Создаёт папку логов и настраивает логгер: handler, формат и уровень INFO."""
-    os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+def setup_logging(log_file: str) -> None:
+    """Создаёт папку логов и настраивает логгер."""
+    os.makedirs(os.path.dirname(log_file), exist_ok=True)
     formatter = logging.Formatter(
         "[%(asctime)s] [%(levelname)s] %(name)s: %(message)s"
     )
-    handler = RotatingFileHandler(LOG_FILE, maxBytes=500_000, backupCount=5)
+    handler = RotatingFileHandler(log_file, maxBytes=500_000, backupCount=5)
     handler.setFormatter(formatter)
     logger.setLevel(logging.INFO)
     logger.addHandler(handler)
@@ -24,11 +22,7 @@ def setup_logging() -> None:
 def format_review_message(
     lesson_title: str, is_negative: bool, lesson_url: str
 ) -> str:
-    """
-    Формирует текст уведомления о проверке:
-      - если is_negative=True, указывает на ошибки;
-      - иначе — что всё хорошо.
-    """
+    """Формирует текст уведомления о проверке."""
     if is_negative:
         return (
             f"У вас проверили работу «{lesson_title}»\n"
@@ -42,19 +36,14 @@ def format_review_message(
     )
 
 def main() -> None:
-    """
-    Запускает бот:
-      1. Грузит .env
-      2. Настраивает логгер
-      3. Читает переменные окружения
-      4. Цикл long-polling и отправка в Telegram
-    """
+    """Запускает бота: загрузка .env, настройка логгера, long-polling."""
     load_dotenv()
-    setup_logging()
+    log_file = os.path.join("logs", "devman_bot.log")
+    setup_logging(log_file)
 
-    telegram_token     = os.environ["TELEGRAM_BOT_TOKEN"]
-    telegram_chat_id   = os.environ["TELEGRAM_CHAT_ID"]
-    devman_api_token   = os.environ["DEVMAN_API_TOKEN"]
+    telegram_token      = os.environ["TELEGRAM_BOT_TOKEN"]
+    telegram_chat_id    = os.environ["TELEGRAM_CHAT_ID"]
+    devman_api_token    = os.environ["DEVMAN_API_TOKEN"]
     devman_longpoll_url = os.getenv(
         "DEVMAN_LONGPOLL_URL",
         "https://dvmn.org/api/long_polling/"
@@ -95,7 +84,6 @@ def main() -> None:
 
     except KeyboardInterrupt:
         logger.info("Получен сигнал прерывания — завершаем работу")
-        return
 
 if __name__ == "__main__":
     main()
