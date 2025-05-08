@@ -6,24 +6,20 @@ import requests
 import telegram
 from logging.handlers import RotatingFileHandler
 
-LOG_FILE = os.path.join("logs", "devman_bot.log")
-FORMATTER = logging.Formatter(
-    "[%(asctime)s] [%(levelname)s] %(name)s: %(message)s"
-)
+logger = logging.getLogger("devman_bot")
 
-def ensure_log_directory() -> None:
-    """Создаёт папку для логов, если её ещё нет."""
-    os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+LOG_FILE = os.path.join("logs", "devman_bot.log")
 
 def setup_logging() -> None:
-    """Настраивает логгер 'devman_bot': handler, формат и уровень INFO."""
+    """Создаёт папку логов и настраивает логгер: handler, формат и уровень INFO."""
+    os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+    formatter = logging.Formatter(
+        "[%(asctime)s] [%(levelname)s] %(name)s: %(message)s"
+    )
     handler = RotatingFileHandler(LOG_FILE, maxBytes=500_000, backupCount=5)
-    handler.setFormatter(FORMATTER)
-    log = logging.getLogger("devman_bot")
-    log.setLevel(logging.INFO)
-    log.addHandler(handler)
-
-logger = logging.getLogger("devman_bot")
+    handler.setFormatter(formatter)
+    logger.setLevel(logging.INFO)
+    logger.addHandler(handler)
 
 def format_review_message(
     lesson_title: str, is_negative: bool, lesson_url: str
@@ -49,12 +45,11 @@ def main() -> None:
     """
     Запускает бот:
       1. Грузит .env
-      2. Создаёт папку логов и настраивает логгер
+      2. Настраивает логгер
       3. Читает переменные окружения
       4. Цикл long-polling и отправка в Telegram
     """
     load_dotenv()
-    ensure_log_directory()
     setup_logging()
 
     telegram_token     = os.environ["TELEGRAM_BOT_TOKEN"]
@@ -74,17 +69,17 @@ def main() -> None:
             params = {"timestamp": last_timestamp} if last_timestamp else {}
             headers = {"Authorization": f"Token {devman_api_token}"}
 
-            resp = requests.get(
+            response = requests.get(
                 devman_longpoll_url,
                 headers=headers,
                 params=params,
                 timeout=90
             )
-            resp.raise_for_status()
-            data = resp.json()
+            response.raise_for_status()
+            response_data = response.json()
 
-            if data["status"] == "found":
-                for attempt in data["new_attempts"]:
+            if response_data["status"] == "found":
+                for attempt in response_data["new_attempts"]:
                     msg = format_review_message(
                         attempt["lesson_title"],
                         attempt["is_negative"],
@@ -92,11 +87,11 @@ def main() -> None:
                     )
                     bot.send_message(chat_id=telegram_chat_id, text=msg)
                     logger.info(f"Проверка обработана: {attempt['lesson_title']}")
-                last_timestamp = data["last_attempt_timestamp"]
+                last_timestamp = response_data["last_attempt_timestamp"]
                 logger.debug(f"Обновлён timestamp: {last_timestamp}")
             else:
                 logger.debug("Long-polling timeout — повторный запрос")
-                last_timestamp = data["timestamp"]
+                last_timestamp = response_data["timestamp"]
 
     except KeyboardInterrupt:
         logger.info("Получен сигнал прерывания — завершаем работу")
