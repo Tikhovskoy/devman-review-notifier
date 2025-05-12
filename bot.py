@@ -9,11 +9,6 @@ from logging.handlers import RotatingFileHandler
 logger = logging.getLogger("devman_bot")
 
 
-def ensure_log_directory(log_file_path: str) -> None:
-    """Создаёт директорию для логов, если она не существует."""
-    os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
-
-
 def setup_logging(log_file_path: str) -> None:
     """Настраивает логгер."""
     formatter = logging.Formatter(
@@ -46,12 +41,12 @@ def main() -> None:
     """Запускает бота: загрузка .env, настройка логгера, long-polling."""
     load_dotenv()
     log_file_path = os.path.join("logs", "devman_bot.log")
-    ensure_log_directory(log_file_path)
+    os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
     setup_logging(log_file_path)
 
-    telegram_token      = os.environ["TELEGRAM_BOT_TOKEN"]
-    telegram_chat_id    = os.environ["TELEGRAM_CHAT_ID"]
-    devman_api_token    = os.environ["DEVMAN_API_TOKEN"]
+    telegram_token = os.environ["TELEGRAM_BOT_TOKEN"]
+    telegram_chat_id = os.environ["TELEGRAM_CHAT_ID"]
+    devman_api_token = os.environ["DEVMAN_API_TOKEN"]
     devman_longpoll_url = os.getenv(
         "DEVMAN_LONGPOLL_URL",
         "https://dvmn.org/api/long_polling/"
