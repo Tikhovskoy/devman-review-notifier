@@ -1,5 +1,4 @@
 import os
-import time
 import logging
 from dotenv import load_dotenv
 import requests
@@ -10,9 +9,13 @@ from logging.handlers import RotatingFileHandler
 logger = logging.getLogger("devman_bot")
 
 
-def setup_logging(log_file_path: str) -> None:
-    """Создаёт папку логов и настраивает логгер."""
+def ensure_log_directory(log_file_path: str) -> None:
+    """Создаёт директорию для логов, если она не существует."""
     os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
+
+
+def setup_logging(log_file_path: str) -> None:
+    """Настраивает логгер."""
     formatter = logging.Formatter(
         "[%(asctime)s] [%(levelname)s] %(name)s: %(message)s"
     )
@@ -43,6 +46,7 @@ def main() -> None:
     """Запускает бота: загрузка .env, настройка логгера, long-polling."""
     load_dotenv()
     log_file_path = os.path.join("logs", "devman_bot.log")
+    ensure_log_directory(log_file_path)
     setup_logging(log_file_path)
 
     telegram_token      = os.environ["TELEGRAM_BOT_TOKEN"]
