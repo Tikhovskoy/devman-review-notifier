@@ -21,7 +21,10 @@ class TelegramLogHandler(logging.Handler):
     def emit(self, record):
         try:
             log_entry = self.format(record)
-            self.bot.send_message(chat_id=self.chat_id, text=f"🚨 Лог {record.levelname}:\n{log_entry}")
+            self.bot.send_message(
+                chat_id=self.chat_id,
+                text=f"Лог {record.levelname}:\n{log_entry}"
+            )
         except Exception as e:
             print(f"Ошибка отправки лога в Telegram: {e}")
 
@@ -63,7 +66,7 @@ def format_review_message(lesson_title: str, is_negative: bool, lesson_url: str)
 
 
 def main() -> None:
-    """Запускает бота: загрузка .env, настройка логгера, long-polling."""
+    """Запускает бота Devman и ведёт логирование."""
     load_dotenv()
     log_file_path = os.path.join("logs", "devman_bot.log")
     os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
@@ -83,8 +86,6 @@ def main() -> None:
 
     while True:
         try:
-            1 / 0  
-
             last_timestamp = None
             while True:
                 params = {"timestamp": last_timestamp} if last_timestamp else {}
@@ -104,17 +105,21 @@ def main() -> None:
                         msg = format_review_message(
                             attempt["lesson_title"],
                             attempt["is_negative"],
-                            attempt["lesson_url"],
+                            attempt["lesson_url"]
                         )
                         bot.send_message(chat_id=telegram_chat_id, text=msg)
-                        logger.info(f"Проверка обработана: {attempt['lesson_title']}")
+                        logger.info(
+                            f"Проверка обработана: {attempt['lesson_title']}"
+                        )
                     last_timestamp = review_response.get("last_attempt_timestamp")
                     logger.debug(f"Обновлён timestamp: {last_timestamp}")
                 else:
                     logger.debug("Long-polling timeout — повторный запрос")
                     last_timestamp = review_response.get("timestamp")
                     if not last_timestamp:
-                        logger.warning(f"Нет ключа 'timestamp' в ответе: {review_response}")
+                        logger.warning(
+                            f"Нет ключа 'timestamp' в ответе: {review_response}"
+                        )
 
         except requests.exceptions.ReadTimeout:
             logger.warning('Таймаут запроса к Devman API. Повтор через 10 секунд.')
