@@ -1,12 +1,13 @@
 import os
+import time
 import logging
 from dotenv import load_dotenv
 import requests
 import telegram
 from logging.handlers import RotatingFileHandler
 
-
-logger = logging.getLogger("devman_bot")
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 
 class TelegramLogHandler(logging.Handler):
@@ -20,7 +21,7 @@ class TelegramLogHandler(logging.Handler):
     def emit(self, record):
         try:
             log_entry = self.format(record)
-            self.bot.send_message(chat_id=self.chat_id, text=f"Лог {record.levelname}:\n{log_entry}")
+            self.bot.send_message(chat_id=self.chat_id, text=f"🚨 Лог {record.levelname}:\n{log_entry}")
         except Exception as e:
             print(f"Ошибка отправки лога в Telegram: {e}")
 
@@ -41,15 +42,12 @@ def setup_logging(log_file_path: str, bot_token: str, chat_id: str) -> None:
     telegram_handler.setLevel(logging.ERROR)
     telegram_handler.setFormatter(formatter)
 
-    logger.setLevel(logging.INFO)
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
     logger.addHandler(telegram_handler)
 
 
-def format_review_message(
-    lesson_title: str, is_negative: bool, lesson_url: str
-) -> str:
+def format_review_message(lesson_title: str, is_negative: bool, lesson_url: str) -> str:
     """Формирует текст уведомления о проверке."""
     if is_negative:
         return (
@@ -83,8 +81,8 @@ def main() -> None:
     last_timestamp = None
     logger.info("Бот запущен. Ожидаем новые проверки от Devman…")
 
-    try:
-        while True:
+    while True:
+        try:
             params = {"timestamp": last_timestamp} if last_timestamp else {}
             headers = {"Authorization": f"Token {devman_api_token}"}
 
@@ -114,10 +112,15 @@ def main() -> None:
                 if not last_timestamp:
                     logger.warning(f"Нет ключа 'timestamp' в ответе: {review_response}")
 
-    except Exception as e:
-        logger.exception(f"Критическая ошибка бота: {e}")
-    except KeyboardInterrupt:
-        logger.info("Получен сигнал прерывания — завершаем работу")
+        except requests.exceptions.ReadTimeout:
+            logger.warning('Таймаут запроса к Devman API. Повтор через 10 секунд.')
+            time.sleep(10)
+        except requests.exceptions.RequestException as error:
+            logger.exception(f'Ошибка при запросе к Devman API: {error}')
+            time.sleep(10)
+        except Exception as e:
+            logger.exception(f"Критическая ошибка бота: {e}")
+            time.sleep(10)
 
 
 if __name__ == "__main__":
