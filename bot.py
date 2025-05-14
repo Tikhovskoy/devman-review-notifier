@@ -78,39 +78,43 @@ def main() -> None:
 
     setup_logging(log_file_path, telegram_token, telegram_chat_id)
     bot = telegram.Bot(token=telegram_token)
-    last_timestamp = None
+
     logger.info("Бот запущен. Ожидаем новые проверки от Devman…")
 
     while True:
         try:
-            params = {"timestamp": last_timestamp} if last_timestamp else {}
-            headers = {"Authorization": f"Token {devman_api_token}"}
+            1 / 0  
 
-            response = requests.get(
-                devman_longpoll_url,
-                headers=headers,
-                params=params,
-                timeout=90
-            )
-            response.raise_for_status()
-            review_response = response.json()
+            last_timestamp = None
+            while True:
+                params = {"timestamp": last_timestamp} if last_timestamp else {}
+                headers = {"Authorization": f"Token {devman_api_token}"}
 
-            if review_response.get("status") == "found":
-                for attempt in review_response["new_attempts"]:
-                    msg = format_review_message(
-                        attempt["lesson_title"],
-                        attempt["is_negative"],
-                        attempt["lesson_url"],
-                    )
-                    bot.send_message(chat_id=telegram_chat_id, text=msg)
-                    logger.info(f"Проверка обработана: {attempt['lesson_title']}")
-                last_timestamp = review_response.get("last_attempt_timestamp")
-                logger.debug(f"Обновлён timestamp: {last_timestamp}")
-            else:
-                logger.debug("Long-polling timeout — повторный запрос")
-                last_timestamp = review_response.get("timestamp")
-                if not last_timestamp:
-                    logger.warning(f"Нет ключа 'timestamp' в ответе: {review_response}")
+                response = requests.get(
+                    devman_longpoll_url,
+                    headers=headers,
+                    params=params,
+                    timeout=90
+                )
+                response.raise_for_status()
+                review_response = response.json()
+
+                if review_response.get("status") == "found":
+                    for attempt in review_response["new_attempts"]:
+                        msg = format_review_message(
+                            attempt["lesson_title"],
+                            attempt["is_negative"],
+                            attempt["lesson_url"],
+                        )
+                        bot.send_message(chat_id=telegram_chat_id, text=msg)
+                        logger.info(f"Проверка обработана: {attempt['lesson_title']}")
+                    last_timestamp = review_response.get("last_attempt_timestamp")
+                    logger.debug(f"Обновлён timestamp: {last_timestamp}")
+                else:
+                    logger.debug("Long-polling timeout — повторный запрос")
+                    last_timestamp = review_response.get("timestamp")
+                    if not last_timestamp:
+                        logger.warning(f"Нет ключа 'timestamp' в ответе: {review_response}")
 
         except requests.exceptions.ReadTimeout:
             logger.warning('Таймаут запроса к Devman API. Повтор через 10 секунд.')
