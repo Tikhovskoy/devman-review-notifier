@@ -71,6 +71,81 @@ python bot.py
 
 ---
 
+## Деплой на сервер
+
+### Установить systemd-сервис:
+
+1. Скопировать код на сервер:
+
+```bash
+git clone git@github.com:Tikhovskoy/devman-review-notifier.git /opt/telegram-bot
+```
+
+2. Создать виртуальное окружение и установить зависимости:
+
+```bash
+cd /opt/telegram-bot
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+3. Создать файл юнита:
+
+```bash
+sudo nano /etc/systemd/system/devmanbot.service
+```
+
+Вставить:
+
+```ini
+[Unit]
+Description=Devman Review Notifier Bot
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/telegram-bot
+ExecStart=/opt/telegram-bot/venv/bin/python bot.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+4. Перезапуск сервиса:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable devmanbot
+sudo systemctl start devmanbot
+```
+
+5. Проверка:
+
+```bash
+sudo systemctl status devmanbot
+sudo journalctl -f -u devmanbot
+```
+
+---
+
+## Полезные команды для управления ботом
+
+```bash
+# Обновить код
+cd /opt/telegram-bot
+git pull
+
+# Перезапустить бота
+sudo systemctl restart devmanbot
+
+# Смотреть логи
+sudo journalctl -f -u devmanbot
+```
+
+---
+
 ## Описание функций
 
 * **`setup_logging()`**
